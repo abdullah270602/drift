@@ -42,6 +42,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,6 +69,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 
@@ -82,6 +85,7 @@ fun Editor(
 ) {
     val ctx = LocalContext.current
     val colors = MaterialTheme.colorScheme
+    val focus = LocalFocusManager.current
     val c = collection
     // The name is typed locally and saved on the way out, so we don't hit disk per keystroke.
     var name by rememberSaveable(c.id) { mutableStateOf(c.name) }
@@ -125,7 +129,11 @@ fun Editor(
                         value = name, onValueChange = { name = it.take(40) }, singleLine = true,
                         textStyle = MaterialTheme.typography.displaySmall.copy(color = colors.onBackground),
                         cursorBrush = SolidColor(colors.onBackground),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            focus.clearFocus()
+                            if (name.trim() != c.name) update { it.copy(name = name.trim()) }
+                        }),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

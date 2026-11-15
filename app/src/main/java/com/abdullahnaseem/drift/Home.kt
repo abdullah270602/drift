@@ -192,7 +192,7 @@ private fun CollectionCard(c: Collection, live: Boolean, onOpen: () -> Unit, onT
                 Box(Modifier.weight(1f).aspectRatio(0.75f).clip(RoundedCornerShape(12.dp))) {
                     Photo(shown.getOrNull(i), Modifier.fillMaxSize())
                     if (i == 3 && c.photos.size > 4) Box(
-                        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
+                        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
                         contentAlignment = Alignment.Center,
                     ) { Text("+${c.photos.size - 3}", style = MaterialTheme.typography.titleMedium, color = Color.White) }
                 }
