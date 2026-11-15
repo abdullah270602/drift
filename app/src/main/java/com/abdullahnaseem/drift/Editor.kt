@@ -15,10 +15,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,25 +31,25 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -68,11 +68,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,11 +91,13 @@ fun Editor(
     val ctx = LocalContext.current
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
     val c = collection
-    // The name is typed locally and saved on the way out, so we don't hit disk per keystroke.
+    // The name is typed locally and saved on Done or on the way out, not per keystroke.
     var name by rememberSaveable(c.id) { mutableStateOf(c.name) }
     var selected by remember(c.id) { mutableStateOf(emptySet<String>()) }
     var editingTime by remember { mutableStateOf<Boolean?>(null) } // true = start, false = end
+    var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     val latest by rememberUpdatedState(c)
@@ -110,25 +117,35 @@ fun Editor(
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
+            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars).imePadding(),
         ) {
             full {
-                Box(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
-                    Box(Modifier.size(44.dp).press(onBack).clip(CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Glyph.Back, "Back", tint = colors.onBackground)
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconTap(Glyph.Back, "Back", onBack)
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        IconTap(Glyph.More, "More", { menu = true })
+                        DropdownMenu(menu, { menu = false }, containerColor = colors.surface, shape = Control) {
+                            DropdownMenuItem(
+                                text = { Text("Delete collection", color = colors.error) },
+                                leadingIcon = { Icon(Glyph.Trash, null, tint = colors.error) },
+                                onClick = { menu = false; confirmDelete = true },
+                            )
+                        }
                     }
                 }
             }
             full {
-                Box(Modifier.padding(top = 4.dp, bottom = 18.dp)) {
-                    if (name.isEmpty()) Text("Untitled", style = MaterialTheme.typography.displaySmall, color = colors.onSurfaceVariant.copy(alpha = 0.6f))
+                Box(Modifier.padding(top = 20.dp, bottom = 28.dp)) {
+                    val title = MaterialTheme.typography.displaySmall.copy(fontSize = 30.sp, lineHeight = 36.sp)
+                    if (name.isEmpty()) Text("Name this collection", style = title, color = colors.onSurfaceVariant.copy(alpha = 0.55f))
                     BasicTextField(
                         value = name, onValueChange = { name = it.take(40) }, singleLine = true,
-                        textStyle = MaterialTheme.typography.displaySmall.copy(color = colors.onBackground),
-                        cursorBrush = SolidColor(colors.onBackground),
+                        textStyle = title.copy(color = colors.onBackground),
+                        cursorBrush = SolidColor(Sun),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             focus.clearFocus()
@@ -140,84 +157,84 @@ fun Editor(
             }
 
             full {
-                Column(Modifier.clip(RoundedCornerShape(24.dp)).background(colors.surface).padding(16.dp)) {
-                    SectionLabel("Show on")
-                    Segmented(
-                        listOf("Home", "Lock", "Both"), c.target.ordinal,
-                        { i -> update { it.copy(target = Target.entries[i]) } },
-                    )
+                Column {
+                    Label("Show on")
+                    Segmented(listOf("Home", "Lock", "Both"), c.target.ordinal, { i -> update { it.copy(target = Target.entries[i]) } })
 
-                    SectionLabel("Change", Modifier.padding(top = 22.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Intervals.forEach { (min, label) ->
-                            Pill(label, c.intervalMin == min) { update { it.copy(intervalMin = min) } }
-                        }
+                    Hairline(Modifier.padding(vertical = 24.dp))
+                    Label("Change every")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Debug builds get a 1-minute option so background rotation can be tested quickly.
+                        val debug = ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+                        (if (debug) listOf(1 to "1 min") + Intervals else Intervals).forEach { (min, label) -> Chip(label, c.intervalMin == min) { update { it.copy(intervalMin = min) } } }
                     }
 
-                    SectionLabel("When", Modifier.padding(top = 22.dp))
+                    Hairline(Modifier.padding(vertical = 24.dp))
+                    Label("Active")
                     Segmented(
                         listOf("Always", "On a schedule"), if (c.schedule == null) 0 else 1,
                         { i -> update { it.copy(schedule = if (i == 0) null else it.schedule ?: Schedule()) } },
                     )
                     AnimatedVisibility(c.schedule != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         val s = c.schedule ?: Schedule()
-                        Column(Modifier.padding(top = 16.dp)) {
-                            Days(s.days) { d -> update { it.copy(schedule = s.copy(days = d)) } }
-                            Spacer(Modifier.height(8.dp))
-                            Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.padding(top = 18.dp)) {
+                            Days(s.days) { d -> haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); update { it.copy(schedule = s.copy(days = d)) } }
+                            Row(Modifier.fillMaxWidth().padding(top = 14.dp).height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("All day", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                Switch(
-                                    s.allDay,
-                                    { on -> update { it.copy(schedule = if (on) s.copy(start = 0, end = 0) else s.copy(start = 9 * 60, end = 17 * 60)) } },
-                                    colors = switchColors(),
-                                )
+                                DriftSwitch(s.allDay, { on ->
+                                    update { it.copy(schedule = if (on) s.copy(start = 0, end = 0) else s.copy(start = 9 * 60, end = 17 * 60)) }
+                                })
                             }
                             AnimatedVisibility(!s.allDay) {
-                                Column {
-                                    TimeRow("From", timeText(ctx, s.start)) { editingTime = true }
-                                    TimeRow("Until", timeText(ctx, s.end) + if (s.end < s.start) "  (next day)" else "") { editingTime = false }
+                                Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Hours", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                    Time(timeText(ctx, s.start)) { editingTime = true }
+                                    Text("–", Modifier.padding(horizontal = 8.dp), color = colors.onSurfaceVariant)
+                                    Time(timeText(ctx, s.end)) { editingTime = false }
                                 }
                             }
                             Text(
-                                if (others > 0) "While scheduled, this collection takes over from always-on ones."
-                                else "Outside these hours, your wallpaper stays as it is.",
-                                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp),
+                                when {
+                                    s.days == 0 -> "Pick at least one day."
+                                    !s.allDay && s.end < s.start -> "Runs past midnight into the next day."
+                                    others > 0 -> "Takes over from always-on collections during these hours."
+                                    else -> "Outside these hours, your wallpaper stays as it is."
+                                },
+                                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 10.dp),
                             )
                         }
                     }
-                }
-            }
-
-            full {
-                Row(Modifier.padding(top = 26.dp), verticalAlignment = Alignment.CenterVertically) {
-                    SectionLabel("${c.photos.size} photo${if (c.photos.size == 1) "" else "s"}", Modifier.weight(1f))
+                    Hairline(Modifier.padding(top = 24.dp, bottom = 20.dp))
+                    Label("${c.photos.size} photo${if (c.photos.size == 1) "" else "s"}")
                 }
             }
 
             item {
                 Box(
                     Modifier.aspectRatio(0.75f).press { pick.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
-                        .clip(RoundedCornerShape(14.dp)).border(1.5.dp, colors.outline, RoundedCornerShape(14.dp)),
+                        .clip(Control).background(colors.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Glyph.Add, "Add photos", tint = colors.onSurfaceVariant) }
             }
             items(c.photos, key = { it }) { uri ->
                 val on = uri in selected
                 val scale by animateFloatAsState(if (on) 0.88f else 1f, label = "sel")
-                Box(Modifier.aspectRatio(0.75f).animateItem().press { selected = if (on) selected - uri else selected + uri }) {
-                    Photo(uri, Modifier.fillMaxSize().scale(scale).clip(RoundedCornerShape(14.dp)))
+                Box(Modifier.aspectRatio(0.75f).animateItem().press {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    selected = if (on) selected - uri else selected + uri
+                }) {
+                    Photo(uri, Modifier.fillMaxSize().scale(scale).clip(Control))
                     if (on) Box(
-                        Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp).clip(CircleShape).background(colors.primary),
+                        Modifier.align(Alignment.TopEnd).padding(8.dp).size(24.dp).clip(CircleShape).background(Sun),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Glyph.Check, null, tint = colors.onPrimary, modifier = Modifier.size(16.dp)) }
+                    ) { Icon(Glyph.Check, null, tint = Ink, modifier = Modifier.size(16.dp)) }
                 }
             }
-
-            full {
+            if (c.photos.isNotEmpty()) full {
                 Text(
-                    "Delete collection", style = MaterialTheme.typography.labelLarge, color = colors.error,
-                    modifier = Modifier.padding(top = 36.dp).press { confirmDelete = true }.padding(vertical = 12.dp),
+                    "Tap photos to select and remove them.",
+                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp),
                 )
             }
         }
@@ -240,7 +257,7 @@ fun Editor(
                         val gone = selected
                         selected = emptySet()
                         update { it.copy(photos = it.photos - gone) }
-                    }.clip(RoundedCornerShape(50)).background(colors.onPrimary.copy(alpha = 0.12f))
+                    }.clip(RoundedCornerShape(50)).background(colors.onPrimary.copy(alpha = 0.1f))
                         .padding(horizontal = 18.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -259,6 +276,8 @@ fun Editor(
         AlertDialog(
             onDismissRequest = { editingTime = null },
             containerColor = colors.surface,
+            shape = RoundedCornerShape(28.dp),
+            title = { Text(if (start) "Starts at" else "Ends at", style = MaterialTheme.typography.titleMedium) },
             confirmButton = {
                 TextButton({
                     val m = tp.hour * 60 + tp.minute
@@ -272,11 +291,12 @@ fun Editor(
             text = {
                 TimePicker(
                     tp, colors = TimePickerDefaults.colors(
-                        clockDialColor = colors.surfaceVariant, selectorColor = colors.primary,
-                        timeSelectorSelectedContainerColor = colors.primary, timeSelectorSelectedContentColor = colors.onPrimary,
-                        timeSelectorUnselectedContainerColor = colors.surfaceVariant,
-                        periodSelectorSelectedContainerColor = colors.primary, periodSelectorSelectedContentColor = colors.onPrimary,
-                        clockDialSelectedContentColor = colors.onPrimary,
+                        clockDialColor = colors.surfaceVariant, selectorColor = Sun,
+                        clockDialSelectedContentColor = Ink, clockDialUnselectedContentColor = colors.onSurface,
+                        timeSelectorSelectedContainerColor = Sun, timeSelectorSelectedContentColor = Ink,
+                        timeSelectorUnselectedContainerColor = colors.surfaceVariant, timeSelectorUnselectedContentColor = colors.onSurface,
+                        periodSelectorSelectedContainerColor = Sun, periodSelectorSelectedContentColor = Ink,
+                        periodSelectorUnselectedContentColor = colors.onSurfaceVariant, periodSelectorBorderColor = colors.outline,
                     )
                 )
             },
@@ -286,48 +306,45 @@ fun Editor(
     if (confirmDelete) AlertDialog(
         onDismissRequest = { confirmDelete = false },
         containerColor = colors.surface,
-        title = { Text("Delete “${c.name.ifBlank { "Untitled" }}”?") },
-        text = { Text("Your photos stay in your gallery. Only this collection goes.") },
+        shape = RoundedCornerShape(28.dp),
+        title = { Text("Delete “${c.name.ifBlank { "Untitled" }}”?", style = MaterialTheme.typography.titleLarge) },
+        text = { Text("Your photos stay in your gallery.", color = colors.onSurfaceVariant) },
         confirmButton = { TextButton({ confirmDelete = false; onDelete() }) { Text("Delete", color = colors.error) } },
         dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel", color = colors.onSurface) } },
     )
 }
 
-private fun androidx.compose.foundation.lazy.grid.LazyGridScope.full(content: @Composable () -> Unit) =
+private fun LazyGridScope.full(content: @Composable () -> Unit) =
     item(span = { GridItemSpan(maxLineSpan) }) { content() }
 
 @Composable
 private fun Days(days: Int, onChange: (Int) -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val names = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { i, label ->
+        names.forEachIndexed { i, day ->
             val on = days and (1 shl i) != 0
             Box(
-                Modifier.size(40.dp).press { onChange(days xor (1 shl i)) }.clip(CircleShape)
-                    .background(if (on) colors.primary else colors.surfaceVariant),
+                Modifier.size(38.dp).press { onChange(days xor (1 shl i)) }.clip(CircleShape)
+                    .background(if (on) colors.primary else colors.background)
+                    .border(1.dp, if (on) colors.primary else colors.outline, CircleShape),
                 contentAlignment = Alignment.Center,
-            ) { Text(label, style = MaterialTheme.typography.labelMedium, color = if (on) colors.onPrimary else colors.onSurfaceVariant) }
+            ) {
+                Text(
+                    day.take(1), style = MaterialTheme.typography.labelMedium,
+                    color = if (on) colors.onPrimary else colors.onSurfaceVariant,
+                    modifier = Modifier.semanticsLabel("$day, ${if (on) "on" else "off"}"),
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun TimeRow(label: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(48.dp).press(onClick), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(
-            value, style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-        )
-    }
-}
+private fun Modifier.semanticsLabel(label: String) = semantics { contentDescription = label }
 
 @Composable
-fun switchColors() = MaterialTheme.colorScheme.let { c ->
-    SwitchDefaults.colors(
-        checkedTrackColor = c.primary, checkedThumbColor = c.onPrimary,
-        uncheckedTrackColor = c.surfaceVariant, uncheckedBorderColor = c.surfaceVariant, uncheckedThumbColor = c.onSurfaceVariant,
-    )
-}
-
+private fun Time(text: String, onClick: () -> Unit) = Text(
+    text, style = MaterialTheme.typography.bodyLarge.merge(Tnum),
+    modifier = Modifier.press(onClick).clip(Control).background(MaterialTheme.colorScheme.surfaceVariant)
+        .padding(horizontal = 12.dp, vertical = 8.dp),
+)

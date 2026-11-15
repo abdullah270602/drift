@@ -62,7 +62,7 @@ private fun App() {
     var busy by remember { mutableStateOf(false) }
 
     /** Persist an edit, then let the engine react (a new schedule may apply right away). */
-    fun commit(force: Boolean = false, f: (State) -> State) {
+    fun commit(force: Set<Surface> = emptySet(), f: (State) -> State) {
         val before = state
         state = Store.update(ctx, f)
         ctx.release(state, before.collections.flatMap { it.photos })
@@ -103,7 +103,7 @@ private fun App() {
                     editing = new.id
                 },
                 onToggle = { c2, on -> commit { s -> s.copy(collections = s.collections.map { if (it.id == c2.id) it.copy(enabled = on) else it }) } },
-                onShuffle = { commit(force = true) { it } },
+                onShuffle = { surfaces -> commit(force = surfaces) { it } },
             ) else Editor(
                 collection = c,
                 others = state.collections.size - 1,

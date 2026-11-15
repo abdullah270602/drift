@@ -24,9 +24,9 @@ object Engine {
     private const val TAG = "Drift"
     private const val WINDOW_MS = 10 * 60_000L // the system grants inexact alarms at least 10 min
 
-    /** Apply anything due now (or everything, if [force]) and book the next wake-up. */
+    /** Apply anything due now (and whatever is in [force]) and book the next wake-up. */
     @Synchronized
-    fun run(ctx: Context, force: Boolean = false) {
+    fun run(ctx: Context, force: Set<Surface> = emptySet()) {
         val now = LocalDateTime.now()
         val nowMs = System.currentTimeMillis()
         val state = Store.load(ctx)
@@ -36,7 +36,7 @@ object Engine {
         fun due(s: Surface, c: Collection?): Boolean {
             c ?: return false
             val shown = state.shown[s] ?: return true
-            return force || shown.collectionId != c.id || c.photos.none { it == shown.photo } ||
+            return s in force || shown.collectionId != c.id || c.photos.none { it == shown.photo } ||
                 shown.at > nowMs || // clock went backwards
                 (c.photos.size > 1 && nowMs >= shown.at + c.intervalMin * 60_000L - 60_000L)
         }
@@ -100,7 +100,8 @@ object Engine {
         false
     }
 
-    private fun schedule(ctx: Context, s: State, now: LocalDateTime) {
+    /** When something may next change: an interval running out, or a schedule starting or ending. */
+    fun nextWake(s: State, now: LocalDateTime): Long? {
         val zone = ZoneId.systemDefault()
         val times = buildList {
             for (surface in Surface.entries) {
@@ -114,12 +115,16 @@ object Engine {
                 c.schedule?.let { add(it.nextEdge(now).atZone(zone).toInstant().toEpochMilli()) }
             }
         }
+        // Never book the past: unreadable photos would otherwise spin a wake-up loop.
+        return times.minOrNull()?.coerceAtLeast(System.currentTimeMillis() + 60_000L)
+    }
+
+    private fun schedule(ctx: Context, s: State, now: LocalDateTime) {
+        val next = nextWake(s, now)
         val am = ctx.getSystemService(AlarmManager::class.java)
         val pi = PendingIntent.getBroadcast(
             ctx, 0, Intent(ctx, Receiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        // Never book the past: unreadable photos would otherwise spin a wake-up loop.
-        val next = times.minOrNull()?.coerceAtLeast(System.currentTimeMillis() + 5 * 60_000L)
         if (next == null) am.cancel(pi)
         else am.setWindow(AlarmManager.RTC_WAKEUP, next, WINDOW_MS, pi)
         Log.i(TAG, "Next check: ${next?.let { java.time.Instant.ofEpochMilli(it) } ?: "none"}")

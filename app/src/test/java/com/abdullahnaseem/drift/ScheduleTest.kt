@@ -39,3 +39,13 @@ class ScheduleTest {
         assertEquals(at(7, 0), weekend.schedule!!.nextEdge(at(6, 12)))
     }
 }
+
+class WordingTest {
+    @Test fun dayRanges() {
+        assertEquals("Weekdays", daysText(0b0011111))
+        assertEquals("Sun–Fri", daysText(0b1011111))
+        assertEquals("Sat–Mon", daysText(0b1100001))
+        assertEquals("Mon, Wed", daysText(0b0000101))
+        assertEquals("Mon, Tue", daysText(0b0000011))
+    }
+}
