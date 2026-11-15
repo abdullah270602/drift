@@ -75,7 +75,7 @@ private val Light = lightColorScheme(
     surfaceVariant = Color(0xFFEDEAE4), onSurfaceVariant = Color(0xFF77716A),
     surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFEDEAE4),
     outline = Color(0x1F1A1816), outlineVariant = Color(0x141A1816),
-    error = Color(0xFFC4352B), tertiary = Sun,
+    error = Color(0xFFC4352B), tertiary = Color(0xFFB0602F), // deeper peach for text on white
 )
 
 private val Dark = darkColorScheme(

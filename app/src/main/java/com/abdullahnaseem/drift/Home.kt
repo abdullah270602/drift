@@ -125,7 +125,7 @@ private fun Header(state: State, now: LocalDateTime, busy: Boolean, onShuffle: (
                 when {
                     !anyOn -> "Paused"
                     next == null -> "Nothing else scheduled"
-                    else -> "Next change around ${DateFormat.getTimeFormat(ctx).format(Date(next))}"
+                    else -> "Next change around ${timeText(ctx, java.time.Instant.ofEpochMilli(next).atZone(java.time.ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute })}"
                 },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -197,7 +197,7 @@ private fun CollectionRow(c: Collection, live: Boolean, onOpen: () -> Unit, onTo
                     if (live && c.schedule != null) append(" · ")
                     if (c.schedule != null) append(scheduleText(ctx, c.schedule))
                 },
-                style = MaterialTheme.typography.bodySmall, color = if (live) Sun else colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall, color = if (live) colors.tertiary else colors.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
