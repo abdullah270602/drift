@@ -16,6 +16,18 @@ A minimal wallpaper rotator for Android. Pick photos, group them into collection
 - **Two permissions, both granted automatically:** `SET_WALLPAPER` and `RECEIVE_BOOT_COMPLETED`. It has no network access, notifications or exact-alarm permission.
 - **No libraries beyond Compose Material 3 and Activity.** State is one JSON file, read with Android's built-in `org.json`. The release APK is about 2.3 MB.
 
+## Measured on a Pixel 9 (Android 17)
+
+- Release APK: 2.3 MB. Cold start: about 370 ms.
+- One background change: 1 wake-up alarm, about 0.7 s of wake lock and about 0.5 s of CPU, after which Android freezes the process.
+- Verified with the app process killed and the screen off:
+  - an interval rotation happened;
+  - a schedule edge handed the lock screen back from a scheduled collection to the always-on one;
+  - the receiver cold-started from the alarm.
+- Photos with EXIF rotation and landscape photos come out upright and centre-cropped.
+
+Debug builds add a "1 min" interval so background behaviour can be checked quickly. Release builds don't show it.
+
 ## Known limits
 
 - Changes land within about 10 minutes of the target time. Exact timing would need the "Alarms & reminders" permission, which Drift deliberately doesn't ask for. In Doze, Android may defer changes further, until the phone wakes.
