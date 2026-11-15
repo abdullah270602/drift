@@ -6,8 +6,13 @@ import android.app.WallpaperManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
+import android.view.WindowManager
+import java.io.ByteArrayOutputStream
+import kotlin.math.roundToInt
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -32,7 +37,8 @@ object Engine {
             c ?: return false
             val shown = state.shown[s] ?: return true
             return force || shown.collectionId != c.id || c.photos.none { it == shown.photo } ||
-                nowMs >= shown.at + c.intervalMin * 60_000L - 60_000L
+                shown.at > nowMs || // clock went backwards
+                (c.photos.size > 1 && nowMs >= shown.at + c.intervalMin * 60_000L - 60_000L)
         }
 
         val shown = state.shown.toMutableMap()
@@ -68,10 +74,26 @@ object Engine {
         schedule(ctx, saved, now)
     }
 
+    /**
+     * Decode at screen size (honouring EXIF rotation), centre-crop, and hand the system a compact JPEG.
+     * Passing the original file straight through skips EXIF and crops from the left edge.
+     */
     private fun setWallpaper(ctx: Context, uri: Uri, flags: Int): Boolean = try {
-        ctx.contentResolver.openInputStream(uri)!!.use {
-            WallpaperManager.getInstance(ctx).setStream(it, null, true, flags)
+        val b = ctx.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
+        val w = minOf(b.width(), b.height()); val h = maxOf(b.width(), b.height())
+        val decoded = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ctx.contentResolver, uri)) { d, info, _ ->
+            d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val scale = maxOf(w.toFloat() / info.size.width, h.toFloat() / info.size.height)
+            if (scale < 1f) d.setTargetSize(
+                maxOf(w, (info.size.width * scale).roundToInt()), maxOf(h, (info.size.height * scale).roundToInt()),
+            )
         }
+        val cw = minOf(decoded.width, (decoded.height * w.toFloat() / h).roundToInt())
+        val ch = minOf(decoded.height, (decoded.width * h.toFloat() / w).roundToInt())
+        val cropped = Bitmap.createBitmap(decoded, (decoded.width - cw) / 2, (decoded.height - ch) / 2, cw, ch)
+        val jpeg = ByteArrayOutputStream().also { cropped.compress(Bitmap.CompressFormat.JPEG, 95, it) }.toByteArray()
+        cropped.recycle(); decoded.recycle()
+        WallpaperManager.getInstance(ctx).setStream(jpeg.inputStream(), null, true, flags)
         true
     } catch (e: Exception) {
         Log.w(TAG, "Can't use $uri", e)
@@ -83,7 +105,10 @@ object Engine {
         val times = buildList {
             for (surface in Surface.entries) {
                 val c = s.activeFor(surface, now) ?: continue
-                if (c.photos.size > 1) s.shown[surface]?.let { add(it.at + c.intervalMin * 60_000L) }
+                val shown = s.shown[surface]
+                // Nothing shown yet means the last attempt failed: retry after a while.
+                if (shown == null || shown.collectionId != c.id) add(System.currentTimeMillis() + 15 * 60_000L)
+                else if (c.photos.size > 1) add(shown.at + c.intervalMin * 60_000L)
             }
             s.collections.filter { it.enabled && it.photos.isNotEmpty() }.forEach { c ->
                 c.schedule?.let { add(it.nextEdge(now).atZone(zone).toInstant().toEpochMilli()) }
@@ -93,7 +118,8 @@ object Engine {
         val pi = PendingIntent.getBroadcast(
             ctx, 0, Intent(ctx, Receiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val next = times.minOrNull()
+        // Never book the past: unreadable photos would otherwise spin a wake-up loop.
+        val next = times.minOrNull()?.coerceAtLeast(System.currentTimeMillis() + 5 * 60_000L)
         if (next == null) am.cancel(pi)
         else am.setWindow(AlarmManager.RTC_WAKEUP, next, WINDOW_MS, pi)
         Log.i(TAG, "Next check: ${next?.let { java.time.Instant.ofEpochMilli(it) } ?: "none"}")
@@ -104,7 +130,7 @@ object Engine {
         override fun onReceive(ctx: Context, intent: Intent) {
             val pending = goAsync()
             Thread {
-                try { run(ctx.applicationContext) } finally { pending.finish() }
+                try { run(ctx.applicationContext) } catch (t: Throwable) { Log.e(TAG, "Run failed", t) } finally { pending.finish() }
             }.start()
         }
     }

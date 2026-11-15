@@ -73,7 +73,15 @@ object Store {
     private fun file(c: Context) = File(c.filesDir, "state.json")
 
     @Synchronized
-    fun load(c: Context): State = runCatching { decode(JSONObject(file(c).readText())) }.getOrDefault(State())
+    fun load(c: Context): State {
+        val f = file(c)
+        if (!f.exists()) return State()
+        return runCatching { decode(JSONObject(f.readText())) }.getOrElse {
+            // Keep the unreadable file for recovery instead of overwriting it with an empty state.
+            f.renameTo(File(c.filesDir, "state.bad.json"))
+            State()
+        }
+    }
 
     @Synchronized
     fun save(c: Context, s: State) {

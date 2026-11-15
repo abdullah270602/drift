@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,9 +40,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Keep read access to picked photos across reboots. */
-fun Context.keep(uris: List<Uri>) = uris.forEach {
-    runCatching { contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+/** Keep read access to picked photos across reboots; returns only those we could keep. */
+fun Context.keep(uris: List<Uri>): List<Uri> = uris.filter {
+    runCatching { contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }.isSuccess
 }
 
 /** Give back access to photos no collection uses any more (the system caps persisted grants). */
@@ -73,6 +74,12 @@ private fun App() {
         }
     }
 
+    // Opening the app re-arms the alarm, which a force-stop clears.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { Engine.run(ctx) }
+        state = Store.load(ctx)
+    }
+
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         AnimatedContent(
             targetState = editing,
@@ -88,8 +95,9 @@ private fun App() {
                 state = state,
                 busy = busy,
                 onOpen = { editing = it },
-                onCreate = { uris ->
-                    ctx.keep(uris)
+                onCreate = { picked ->
+                    val uris = ctx.keep(picked)
+                    if (uris.isEmpty()) return@Home
                     val new = Collection(System.currentTimeMillis(), "", uris.map(Uri::toString))
                     commit { it.copy(collections = it.collections + new) }
                     editing = new.id

@@ -97,8 +97,7 @@ fun Editor(
     fun update(f: (Collection) -> Collection) = onChange(f(c))
 
     val pick = rememberLauncherForActivityResult(PickMultipleVisualMedia()) { uris ->
-        ctx.keep(uris)
-        val add = uris.map { it.toString() }.filterNot { it in c.photos }
+        val add = ctx.keep(uris).map { it.toString() }.filterNot { it in c.photos }
         if (add.isNotEmpty()) update { it.copy(photos = it.photos + add) }
     }
 

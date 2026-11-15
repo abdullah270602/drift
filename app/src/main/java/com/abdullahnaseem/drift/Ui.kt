@@ -65,7 +65,7 @@ private val Light = lightColorScheme(
     background = Color(0xFFF6F5F2), onBackground = Color(0xFF141414),
     surface = Color(0xFFFFFFFF), onSurface = Color(0xFF141414),
     surfaceVariant = Color(0xFFEBE9E4), onSurfaceVariant = Color(0xFF6E6C67),
-    surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFEBE9E4),
+    surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFEBE9E4), surfaceBright = Color(0xFFFFFFFF),
     outline = Color(0xFFD9D6D0), outlineVariant = Color(0xFFE6E3DE),
     error = Color(0xFFC4352B), tertiary = Sun,
 )
@@ -75,7 +75,7 @@ private val Dark = darkColorScheme(
     background = Color(0xFF0C0C0D), onBackground = Color(0xFFF2F1EE),
     surface = Color(0xFF17171A), onSurface = Color(0xFFF2F1EE),
     surfaceVariant = Color(0xFF242428), onSurfaceVariant = Color(0xFF9B9993),
-    surfaceContainerHigh = Color(0xFF1E1E21), surfaceContainerHighest = Color(0xFF2A2A2E),
+    surfaceContainerHigh = Color(0xFF1E1E21), surfaceContainerHighest = Color(0xFF2A2A2E), surfaceBright = Color(0xFF3A3A40),
     outline = Color(0xFF3A3A3F), outlineVariant = Color(0xFF2A2A2E),
     error = Color(0xFFFF6B5E), tertiary = Sun,
 )
@@ -152,7 +152,7 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
     ) {
         val w = maxWidth / options.size
         val x by animateDpAsState(w * selected, spring(dampingRatio = 0.85f, stiffness = 500f), label = "thumb")
-        Box(Modifier.offset(x = x).width(w).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(c.surface))
+        Box(Modifier.offset(x = x).width(w).fillMaxHeight().clip(RoundedCornerShape(11.dp)).background(c.surfaceBright))
         Row(Modifier.fillMaxSize()) {
             options.forEachIndexed { i, label ->
                 val tint by animateColorAsState(if (i == selected) c.onSurface else c.onSurfaceVariant, label = "tint")
