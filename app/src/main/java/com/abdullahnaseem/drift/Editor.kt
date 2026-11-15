@@ -1,8 +1,12 @@
 package com.abdullahnaseem.drift
 
+import android.app.WallpaperManager
+import android.content.ComponentName
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.AnimatedVisibility
@@ -58,6 +62,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -167,6 +172,10 @@ fun Editor(
                         // Debug builds get a 1-minute option so background rotation can be tested quickly.
                         val debug = ctx.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
                         (if (debug) listOf(1 to "1 min") + Intervals else Intervals).forEach { (min, label) -> Chip(label, c.intervalMin == min) { update { it.copy(intervalMin = min) } } }
+                    }
+                    when (c.intervalMin) {
+                        ON_WAKE -> WakeSetup(c.target)
+                        RANDOM -> Hint("A different gap every time, from 30 minutes to 4 hours.")
                     }
 
                     Hairline(Modifier.padding(vertical = 24.dp))
@@ -312,6 +321,50 @@ fun Editor(
         confirmButton = { TextButton({ confirmDelete = false; onDelete() }) { Text("Delete", color = colors.error) } },
         dismissButton = { TextButton({ confirmDelete = false }) { Text("Cancel", color = colors.onSurface) } },
     )
+}
+
+@Composable
+private fun Hint(text: String) = Text(
+    text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(top = 12.dp),
+)
+
+/** "Each wake" needs Drift to be the live wallpaper on the screens it targets; offer the one-time setup. */
+@Composable
+private fun WakeSetup(target: Target) {
+    val ctx = LocalContext.current
+    val colors = MaterialTheme.colorScheme
+    var live by remember { mutableIntStateOf(Engine.liveFlags(ctx)) }
+    val setup = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { live = Engine.liveFlags(ctx) }
+    val need = when (target) {
+        Target.HOME -> WallpaperManager.FLAG_SYSTEM
+        Target.LOCK -> WallpaperManager.FLAG_LOCK
+        Target.BOTH -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+    }
+    if (live and need == need) {
+        Hint("A new photo is ready each time the screen turns off. Drift stays loaded as your wallpaper to do this.")
+        return
+    }
+    Row(
+        Modifier.padding(top = 14.dp).fillMaxWidth().clip(Control).background(colors.surface)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "To change on every wake, Drift needs to be your live wallpaper.",
+            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "Set up", style = MaterialTheme.typography.labelLarge, color = Ink,
+            modifier = Modifier.press {
+                setup.launch(
+                    Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+                        .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(ctx, DriftWallpaper::class.java))
+                )
+            }.clip(RoundedCornerShape(50)).background(Sun).padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+    }
 }
 
 private fun LazyGridScope.full(content: @Composable () -> Unit) =

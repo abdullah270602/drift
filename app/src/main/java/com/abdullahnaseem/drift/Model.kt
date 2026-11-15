@@ -42,6 +42,20 @@ data class Schedule(val days: Int = 0b0011111, val start: Int = 9 * 60, val end:
     }
 }
 
+/** Special [Collection.intervalMin] values. */
+const val ON_WAKE = 0   // change each time the screen turns off (needs the live wallpaper)
+const val RANDOM = -1   // a fresh random gap after every change
+
+/**
+ * How long a photo stays up, or null when only waking the phone changes it.
+ * Random gaps are derived from when the photo went up, so they need no extra state.
+ */
+fun Collection.holdMs(shownAt: Long): Long? = when (intervalMin) {
+    ON_WAKE -> null
+    RANDOM -> (30 + kotlin.random.Random(shownAt).nextInt(211)) * 60_000L // 30 min to 4 h
+    else -> intervalMin * 60_000L
+}
+
 data class Collection(
     val id: Long,
     val name: String,

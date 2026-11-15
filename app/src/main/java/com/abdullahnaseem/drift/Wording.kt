@@ -4,11 +4,13 @@ import android.content.Context
 
 // ── Wording, shared by the list and the editor.
 
-val Intervals = listOf(15 to "15 min", 30 to "30 min", 60 to "1 hr", 180 to "3 hr", 360 to "6 hr", 720 to "12 hr", 1440 to "Daily")
+val Intervals = listOf(ON_WAKE to "Each wake", 15 to "15 min", 30 to "30 min", 60 to "1 hr", 180 to "3 hr", 360 to "6 hr", 720 to "12 hr", 1440 to "Daily", RANDOM to "Random")
 
 fun intervalLabel(min: Int) = Intervals.firstOrNull { it.first == min }?.second ?: "$min min"
 
 fun intervalText(min: Int) = when (min) {
+    ON_WAKE -> "each wake"
+    RANDOM -> "at random"
     1440 -> "daily"
     60 -> "hourly"
     else -> "every " + (Intervals.firstOrNull { it.first == min }?.second ?: "$min min")

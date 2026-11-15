@@ -49,3 +49,14 @@ class WordingTest {
         assertEquals("Mon, Tue", daysText(0b0000011))
     }
 }
+
+class IntervalTest {
+    @Test fun randomIsStableAndInRange() {
+        val c = Collection(1, "r", listOf("a", "b"), intervalMin = RANDOM)
+        val gaps = (0 until 500).map { c.holdMs(1_000_000L * it)!! / 60_000 }
+        assertTrue(gaps.all { it in 30..240 })
+        assertTrue(gaps.toSet().size > 50) // actually varies
+        assertEquals(c.holdMs(42), c.holdMs(42)) // same photo, same gap
+        assertEquals(null, c.copy(intervalMin = ON_WAKE).holdMs(42))
+    }
+}
