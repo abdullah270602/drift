@@ -8,15 +8,16 @@ Pick photos, group them into collections, and choose when each one rotates. In i
 
 ## Screenshots
 
-| Light | Dark |
-|:---:|:---:|
-| <img src="docs/home-light.png" width="260" alt="Home, light"> | <img src="docs/home-dark.png" width="260" alt="Home, dark"> |
-| <img src="docs/editor-light.png" width="260" alt="Collection editor, light"> | <img src="docs/editor-dark.png" width="260" alt="Collection editor, dark"> |
-| <img src="docs/photos-light.png" width="260" alt="Photo grid, light"> | <img src="docs/photos-dark.png" width="260" alt="Photo grid, dark"> |
+<p align="center">
+  <img src="docs/home-dark.png" width="30%" alt="Home screen">
+  <img src="docs/editor-dark.png" width="30%" alt="Collection editor">
+  <img src="docs/photos-dark.png" width="30%" alt="Photos in a collection">
+</p>
 
-A collection's wallpaper on the launcher, and tapping a preview on the home screen to shuffle it:
-
-<img src="docs/launcher.png" width="260" alt="Drift wallpaper on the launcher"> <img src="docs/drift.gif" width="260" alt="Tapping the lock preview to change the wallpaper">
+<p align="center">
+  <img src="docs/launcher.png" width="30%" alt="A Drift wallpaper on the launcher">
+  <img src="docs/drift.gif" width="30%" alt="Tapping a preview to move the wallpaper on">
+</p>
 
 ## What it does
 
@@ -49,7 +50,21 @@ Debug builds add a "1 min" interval so background behaviour can be checked quick
 
 ## Battery
 
-Benchmarks: see below.
+Measured on a Pixel 9 (Android 17) with Android's own battery accounting (`dumpsys batterystats`), plus CPU timers inside the app. Daily figures assume a 4,700 mAh battery.
+
+| Mode | Cost per change | Typical day | Share of battery per day |
+|---|---|---|---|
+| **Daily** | ~0.6 s CPU | 1 change, ~0.03 mAh | **< 0.001%** |
+| **1–12 hours** | ~0.6 s CPU, 1 wake-up alarm | hourly: 24 changes, ~0.7 mAh | **~0.015%** |
+| **Random** (30 min–4 h) | same as timed | ~11 changes, ~0.3 mAh | **~0.007%** |
+| **15 min** | same as timed | 96 changes, ~2.8 mAh | **~0.06%** |
+| **Each wake** | ~0.2 s CPU, no extra wake-up | 100 screen-offs, ~1 mAh | **~0.02%** |
+
+What the numbers mean:
+
+- **Timed modes** (any interval, and Random) cost nothing between changes. The process is dead or frozen, with no wake locks and no polling. Each change costs one alarm wake-up, a process start, one decode at screen size and one JPEG hand-off: about 0.5–0.7 s of CPU and 0.7 s of wake lock. The system's wallpaper renderer then does a small amount of work of its own, not counted above.
+- **Each wake** costs about 0.2 s of CPU per screen-off: about 176 ms to decode the photo, the rest bookkeeping. It never wakes the phone, because the screen turning off has already done that. Kept loaded as the wallpaper and idle, it used 0.17 s of CPU in 5 minutes of screen-off time, and most of that was the one change triggered by turning the screen off. Its real cost is memory: about 56 MB stays loaded while it's your wallpaper.
+- **Most battery-friendly:** Daily, then longer intervals, then Random. Every mode stays well under a tenth of a percent of battery per day. The phone's screen uses more energy in a few seconds than Drift uses in a day.
 
 ## Known limits
 

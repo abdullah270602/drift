@@ -118,12 +118,14 @@ private fun Header(state: State, now: LocalDateTime, busy: Boolean, onShuffle: (
     val ctx = LocalContext.current
     val next = remember(state) { Engine.nextWake(state, now) }
     val anyOn = state.collections.any { it.enabled && it.photos.isNotEmpty() }
+    val active = Surface.entries.mapNotNull { state.activeFor(it, now) }
     Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Drift", style = MaterialTheme.typography.displaySmall.copy(fontSize = 28.sp, lineHeight = 34.sp))
             Text(
                 when {
                     !anyOn -> "Paused"
+                    active.isNotEmpty() && active.all { it.intervalMin == ON_WAKE } && next == null -> "A new photo every time you wake your phone"
                     next == null -> "Nothing else scheduled"
                     else -> "Next change around ${timeText(ctx, java.time.Instant.ofEpochMilli(next).atZone(java.time.ZoneId.systemDefault()).toLocalTime().let { it.hour * 60 + it.minute })}"
                 },
@@ -188,15 +190,12 @@ private fun CollectionRow(c: Collection, live: Boolean, onOpen: () -> Unit, onTo
             Text(c.name.ifBlank { "Untitled" }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
             Text(
-                "${c.photos.size} photo${if (c.photos.size == 1) "" else "s"} · ${targetText(c.target)} · ${intervalLabel(c.intervalMin)}",
+                "${c.photos.size} photo${if (c.photos.size == 1) "" else "s"} · ${intervalLabel(c.intervalMin)}",
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            if (live || c.schedule != null) Text(
-                buildString {
-                    if (live) append("On now")
-                    if (live && c.schedule != null) append(" · ")
-                    if (c.schedule != null) append(scheduleText(ctx, c.schedule))
-                },
+            Text(
+                listOfNotNull(if (live) "On now" else null, targetText(c.target), c.schedule?.let { scheduleText(ctx, it) })
+                    .joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = if (live) colors.tertiary else colors.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
