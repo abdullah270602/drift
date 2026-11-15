@@ -34,6 +34,8 @@ object Engine {
      */
     @Synchronized
     fun run(ctx: Context, force: Set<Surface> = emptySet(), wake: Boolean = false) {
+        val cpu0 = android.os.SystemClock.currentThreadTimeMillis()
+        val wall0 = android.os.SystemClock.elapsedRealtime()
         val now = LocalDateTime.now()
         val nowMs = System.currentTimeMillis()
         val state = Store.load(ctx)
@@ -83,6 +85,9 @@ object Engine {
         val saved = Store.update(ctx) { it.copy(shown = shown, bags = bags.filterKeys { id -> it.collections.any { c -> c.id == id } }) }
         schedule(ctx, saved, now)
         listeners.forEach { it() }
+        val changed = Surface.entries.filter { shown[it] != state.shown[it] }
+        Log.i(TAG, "run wake=$wake changed=$changed cpu=${android.os.SystemClock.currentThreadTimeMillis() - cpu0}ms " +
+            "wall=${android.os.SystemClock.elapsedRealtime() - wall0}ms")
     }
 
     /** Which surfaces currently show Drift's live wallpaper, as WallpaperManager flags. */

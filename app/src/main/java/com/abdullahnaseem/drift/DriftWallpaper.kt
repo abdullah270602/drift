@@ -81,12 +81,14 @@ class DriftWallpaper : WallpaperService() {
             val photo = Store.load(applicationContext).shown[surface]?.photo
             val k = "$photo|${frame.width()}x${frame.height()}"
             if (k != key) {
+                val cpu0 = android.os.SystemClock.currentThreadTimeMillis()
                 val next = photo?.let { runCatching { Rotator.decode(applicationContext, Uri.parse(it), frame.width(), frame.height()) }.getOrNull() }
                 bitmap?.recycle()
                 bitmap = next; key = k
                 notifyColorsChanged() // lets Material You follow the photo
+                Log.i("Drift", "wallpaper decode $surface cpu=${android.os.SystemClock.currentThreadTimeMillis() - cpu0}ms")
             }
-            val canvas = runCatching { surfaceHolder.lockHardwareCanvas() }.getOrNull() ?: return
+            val canvas = runCatching { surfaceHolder.lockCanvas() }.getOrNull() ?: return
             try {
                 canvas.drawColor(Color.BLACK)
                 bitmap?.let { canvas.drawBitmap(it, null, Rect(0, 0, frame.width(), frame.height()), paint) }
